@@ -23,5 +23,3 @@ flutter:
         android:
             package: com.razorpay.razorpay_flutter
             pluginClass: RazorpayFlutterPlugin
-        ios:
-            pluginClass: RazorpayFlutterPlugin
