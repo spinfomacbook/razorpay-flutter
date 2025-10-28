@@ -1,5 +1,8 @@
 package com.razorpay.razorpay_flutter;
 
+import android.app.Activity;
+import android.content.Context;
+
 import androidx.annotation.NonNull;
 
 import org.json.JSONException;
@@ -13,75 +16,66 @@ import io.flutter.plugin.common.MethodCall;
 import io.flutter.plugin.common.MethodChannel;
 import io.flutter.plugin.common.MethodChannel.MethodCallHandler;
 import io.flutter.plugin.common.MethodChannel.Result;
-import io.flutter.plugin.common.PluginRegistry.Registrar;
 
 /**
- * RazorpayFlutterPlugin
+ * RazorpayFlutterPlugin — migrated to Flutter embedding v2
  */
 public class RazorpayFlutterPlugin implements FlutterPlugin, MethodCallHandler, ActivityAware {
 
-    private RazorpayDelegate razorpayDelegate;
-    private ActivityPluginBinding pluginBinding;
-    private static String CHANNEL_NAME = "razorpay_flutter";
+    private static final String CHANNEL_NAME = "razorpay_flutter";
 
+    private MethodChannel channel;
+    private RazorpayDelegate razorpayDelegate;
+    private Activity activity;
+    private Context context;
 
     public RazorpayFlutterPlugin() {
-    }
-
-    /**
-     * Plugin registration for Flutter version < 1.12
-     */
-    public static void registerWith(Registrar registrar) {
-        final MethodChannel channel = new MethodChannel(registrar.messenger(), CHANNEL_NAME);
-        channel.setMethodCallHandler(new RazorpayFlutterPlugin(registrar));
+        // Default constructor
     }
 
     @Override
     public void onAttachedToEngine(@NonNull FlutterPluginBinding binding) {
-        final MethodChannel channel = new MethodChannel(binding.getBinaryMessenger(), CHANNEL_NAME);
+        context = binding.getApplicationContext();
+        channel = new MethodChannel(binding.getBinaryMessenger(), CHANNEL_NAME);
         channel.setMethodCallHandler(this);
     }
 
     @Override
     public void onDetachedFromEngine(@NonNull FlutterPluginBinding binding) {
-    }
-
-
-    /**
-     * Constructor for Flutter version < 1.12
-     * @param registrar
-     */
-    private RazorpayFlutterPlugin(Registrar registrar) {
-        this.razorpayDelegate = new RazorpayDelegate(registrar.activity());
-        registrar.addActivityResultListener(razorpayDelegate);
+        if (channel != null) {
+            channel.setMethodCallHandler(null);
+            channel = null;
+        }
+        context = null;
     }
 
     @Override
     @SuppressWarnings("unchecked")
-    public void onMethodCall(MethodCall call, Result result) {
-
+    public void onMethodCall(@NonNull MethodCall call, @NonNull Result result) {
+        if (razorpayDelegate == null) {
+            result.error("NO_ACTIVITY", "Plugin not attached to an Activity", null);
+            return;
+        }
 
         switch (call.method) {
-
             case "open":
                 razorpayDelegate.openCheckout((Map<String, Object>) call.arguments, result);
                 break;
-
             case "resync":
                 razorpayDelegate.resync(result);
                 break;
-
             default:
                 result.notImplemented();
-
+                break;
         }
-
     }
+
+    // ------------------ ActivityAware methods ------------------
 
     @Override
     public void onAttachedToActivity(@NonNull ActivityPluginBinding binding) {
-        this.razorpayDelegate = new RazorpayDelegate(binding.getActivity());
-        this.pluginBinding = binding;
+        activity = binding.getActivity();
+        razorpayDelegate = new RazorpayDelegate(activity);
         binding.addActivityResultListener(razorpayDelegate);
     }
 
@@ -97,7 +91,10 @@ public class RazorpayFlutterPlugin implements FlutterPlugin, MethodCallHandler, 
 
     @Override
     public void onDetachedFromActivity() {
-        pluginBinding.removeActivityResultListener(razorpayDelegate);
-        pluginBinding = null;
+        if (razorpayDelegate != null && activity != null) {
+            // No manual removal needed; handled by Flutter automatically
+            razorpayDelegate = null;
+        }
+        activity = null;
     }
 }
